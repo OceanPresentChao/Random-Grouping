@@ -41,7 +41,7 @@ h1 {
   text-align: center;
 }
 
-input,
+
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -63,11 +63,16 @@ button:hover {
   border-color: #396cd8;
 }
 
+button:disabled {
+  cursor: no-drop;
+}
+
 input,
 button {
   outline: none;
 }
 
+input,
 select {
   border-radius: 8px;
   border: 1px solid transparent;
