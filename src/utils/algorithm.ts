@@ -3,73 +3,74 @@ export interface LinearModOption {
   A?: number
   C?: number
   M?: number
+  seed?: string
 }
 export function* linearMod(options: LinearModOption = {}) {
   const {
-    A = 27,
-    C = 39,
-    M = 100,
+    A = 2127,
+    C = 213,
+    M = 16684,
+    seed = Math.round(Date.now() / 1000).toString(),
   } = options
-  const seed = Date.now() / 1000
-  let R = (A * seed + C) % M
-  while (1)
-    yield R = (A * R + C) % M
-}
-
-export interface UnidirectHashOption {
-  hashType?: 'sha1' | 'sha2' | 'sha3' | 'md5'
-}
-
-export function* uniDirectHash(options: UnidirectHashOption = {}) {
-  const {
-    hashType = 'md5',
-  } = options
-  let seed = Date.now() / 1000
+  const tmp = Number(seed)
+  let R = (A * tmp + C) % M
   while (1) {
-    switch (hashType) {
-      case 'md5': yield cryptojs.MD5(seed.toString()).toString()
-        break
-      case 'sha1': yield cryptojs.SHA1(seed.toString()).toString()
-        break
-      case 'sha2': yield cryptojs.SHA256(seed.toString()).toString()
-        break
-      case 'sha3': yield cryptojs.SHA3(seed.toString()).toString()
-        break
-    }
-    seed++
+    yield String(R)
+    R = (A * R + C) % M
   }
 }
 
-export interface HmacOption {
+export interface CyptoOption {
   hashType?: 'sha1' | 'sha2' | 'sha3' | 'md5'
+  seed?: string
 }
 
-export function* hmac(options: HmacOption = {}) {
+export function* uniDirectHash(options: CyptoOption = {}) {
   const {
     hashType = 'md5',
   } = options
-  let seed = Date.now() / 1000
+  let {
+    seed = Date.now().toString(),
+  } = options
+  while (1) {
+    switch (hashType) {
+      case 'md5': yield cryptojs.MD5(seed).toString()
+        break
+      case 'sha1': yield cryptojs.SHA1(seed).toString()
+        break
+      case 'sha2': yield cryptojs.SHA256(seed).toString()
+        break
+      case 'sha3': yield cryptojs.SHA3(seed).toString()
+        break
+    }
+    seed = (Number(seed) + 1).toString()
+  }
+}
+
+export function* hmac(options: CyptoOption = {}) {
+  const {
+    hashType = 'md5',
+  } = options
+  let {
+    seed = Date.now().toString(),
+  } = options
   const key = getOTP()
   while (1) {
     switch (hashType) {
-      case 'md5': yield cryptojs.HmacMD5(seed.toString(), key).toString()
+      case 'md5': yield cryptojs.HmacMD5(seed, key).toString()
         break
-      case 'sha1': yield cryptojs.HmacSHA1(seed.toString(), key).toString()
+      case 'sha1': yield cryptojs.HmacSHA1(seed, key).toString()
         break
-      case 'sha2': yield cryptojs.HmacSHA256(seed.toString(), key).toString()
+      case 'sha2': yield cryptojs.HmacSHA256(seed, key).toString()
         break
-      case 'sha3': yield cryptojs.HmacSHA3(seed.toString(), key).toString()
+      case 'sha3': yield cryptojs.HmacSHA3(seed, key).toString()
         break
     }
-    seed++
+    seed = (Number(seed) + 1).toString()
   }
 }
 
-export interface ANSIXOption {
-  hashType?: 'sha1' | 'sha2' | 'sha3' | 'md5'
-}
-
-export function* ANSIX(options: ANSIXOption = {}) {
+export function* ANSIX(options: CyptoOption = {}) {
   const {
     hashType = 'md5',
   } = options
@@ -88,6 +89,30 @@ export function* ANSIX(options: ANSIXOption = {}) {
       case 'sha1': return cryptojs.HmacSHA1(message, key).toString()
       case 'sha2': return cryptojs.HmacSHA256(message, key).toString()
       case 'sha3': return cryptojs.HmacSHA3(message, key).toString()
+    }
+  }
+}
+
+export function* combinedCrypto(options: { seed?: string } = {}) {
+  const {
+    seed = Math.round(Date.now()).toString(),
+  } = options
+  const linearGen = linearMod({ seed })
+  const hashGen = uniDirectHash()
+  const hmacGen = hmac()
+  const ansixGen = ANSIX()
+  while (1) {
+    const rnumber = Number(linearGen.next().value) % 3
+    switch (rnumber) {
+      case 0:
+        yield hashGen.next().value as string
+        break
+      case 1:
+        yield hmacGen.next().value as string
+        break
+      case 2:
+        yield ansixGen.next().value as string
+        break
     }
   }
 }

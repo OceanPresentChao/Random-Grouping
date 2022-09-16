@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs'
-import { people } from '../utils/people'
-import { ANSIX, hmac, linearMod, uniDirectHash } from '../utils/algorithm'
-type RandomAlgorithm = 'LinearMod' | 'UniDirectHash' | 'Hmac' | 'ANSI'
-const algorithmSelections = ['LinearMod', 'UniDirectHash', 'Hmac', 'ANSI']
+import { type People, people } from '../utils/people'
+import { ANSIX, combinedCrypto, hmac, linearMod, uniDirectHash } from '../utils/algorithm'
+type RandomAlgorithm = 'LinearMod' | 'UniDirectHash' | 'Hmac' | 'ANSI' | 'CombinedCrypto'
+const algorithmSelections: Array<RandomAlgorithm> = ['LinearMod', 'UniDirectHash', 'Hmac', 'ANSI', 'CombinedCrypto']
 const algorithm = ref<RandomAlgorithm>('LinearMod')
 const origin = ref(people)
+const randomTimes = ref(1)
 const groupSize = ref(6)
 const isHandled = ref(false)
-const cache: Array<typeof origin.value> = []
+let cache: Array<typeof origin.value> = []
 const group = computed(() => {
   const result = []
   const groupNum = Math.ceil(origin.value.length / groupSize.value)
   let tmp = []
   for (let i = 0; i < origin.value.length; i++) {
-    tmp.push(origin.value[i])
+    tmp.push(origin.value[i].name)
     if ((i + 1) % groupSize.value === 0 || i === origin.value.length - 1) {
       result.push(tmp.concat())
       tmp = []
@@ -24,31 +25,47 @@ const group = computed(() => {
   return result
 })
 
-function shuffleArray<T, U>(
-  arr: Array<T>,
-  generator: Generator<U, void, unknown>,
-): Array<T> {
-  const result = arr.concat().map(v => ({ val: v, index: generator.next().value as U }))
+const map = initGenerators()
+
+watch(algorithm, (v, ov) => {
+  cache = []
+  isHandled.value = false
+})
+
+function initGenerators() {
+  const map = new Map<RandomAlgorithm, Generator<string, void, unknown>>()
+  map.set('ANSI', ANSIX())
+  map.set('LinearMod', linearMod())
+  map.set('Hmac', hmac())
+  map.set('UniDirectHash', uniDirectHash())
+  map.set('CombinedCrypto', combinedCrypto())
+  return map
+}
+
+function shuffleArray(
+  arr: People[],
+  generator: Generator<string, void, unknown>,
+) {
+  const result = arr
+  result.forEach(v => v.randomString = generator.next().value!)
   result.sort((a, b) => {
-    return a.index > b.index ? 1 : -1
+    return a.randomString > b.randomString ? 1 : -1
   })
-  return result.map(v => v.val)
+  return result
 }
 
 function randomGroup(algorithm: RandomAlgorithm) {
   if (!isHandled.value)
     isHandled.value = true
-  if (algorithm === 'LinearMod')
-    origin.value = shuffleArray(origin.value, linearMod())
-  if (algorithm === 'UniDirectHash')
-    origin.value = shuffleArray(origin.value, uniDirectHash())
-  if (algorithm === 'Hmac')
-    origin.value = shuffleArray(origin.value, hmac())
-  if (algorithm === 'ANSI')
-    origin.value = shuffleArray(origin.value, ANSIX())
-  for (let i = 0; i < origin.value.length; i++)
-    origin.value[i].group = Math.ceil((i + 1) / groupSize.value)
-  cache.push(origin.value.concat())
+  if (randomTimes.value < 1)
+    randomTimes.value = 1
+  randomTimes.value = Math.ceil(randomTimes.value)
+  for (let c = 0; c < randomTimes.value; c++) {
+    origin.value = shuffleArray(origin.value, map.get(algorithm)!)
+    for (let i = 0; i < origin.value.length; i++)
+      origin.value[i].group = Math.ceil((i + 1) / groupSize.value)
+    cache.push(JSON.parse(JSON.stringify(origin.value)))
+  }
 }
 
 function outPutCache() {
@@ -77,9 +94,12 @@ function outPutCache() {
     <div>
       <div v-for="(v, i) in group" :key="i">
         <span>Group{{ i + 1 }}:</span>
-        <span v-for="(p, n) in v" :key="n" style="padding:1em;">{{ p.name }}</span>
+        <span v-for="(p, n) in v" :key="n" style="padding:1em;">{{ p }}</span>
       </div>
-      <div>
+      <div style="margin-top: 1rem;">
+        <label>Times: </label>
+        <input v-model="randomTimes" type="number" :min="1" step="1" style="width: 4rem;">
+        <span style="padding: 0.25em;" />
         <button @click="randomGroup(algorithm)">
           Random
         </button>
