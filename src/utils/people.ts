@@ -4,7 +4,7 @@ export interface People {
   randomString: string
 }
 
-const peopleNames = [
+export const peopleNames = [
   '潮海波',
   '李柯凡',
   '许嘉豪',

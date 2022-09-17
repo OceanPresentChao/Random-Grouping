@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, provide, ref, watch } from 'vue'
 import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs'
-import { type People, people } from '../utils/people'
+import { type People, people, peopleNames } from '../utils/people'
 import { ANSIX, combinedCrypto, hmac, linearMod, uniDirectHash } from '../utils/algorithm'
+import Menu from './Menu.vue'
 type RandomAlgorithm = 'LinearMod' | 'UniDirectHash' | 'Hmac' | 'ANSI' | 'CombinedCrypto'
 const algorithmSelections: Array<RandomAlgorithm> = ['LinearMod', 'UniDirectHash', 'Hmac', 'ANSI', 'CombinedCrypto']
 const algorithm = ref<RandomAlgorithm>('LinearMod')
 const origin = ref(people)
 const randomTimes = ref(1)
 const groupSize = ref(6)
-const isHandled = ref(false)
+const shuffleNum = ref(0)
 let cache: Array<typeof origin.value> = []
+const genMap = initGenerators()
+const statisMap = initStatisMap()
+const menuVis = ref(false)
 const group = computed(() => {
   const result = []
   const groupNum = Math.ceil(origin.value.length / groupSize.value)
@@ -25,12 +29,12 @@ const group = computed(() => {
   return result
 })
 
-const map = initGenerators()
-
 watch(algorithm, (v, ov) => {
   cache = []
-  isHandled.value = false
+  shuffleNum.value = 0
 })
+
+provide('statisMap', statisMap)
 
 function initGenerators() {
   const map = new Map<RandomAlgorithm, Generator<string, void, unknown>>()
@@ -40,6 +44,27 @@ function initGenerators() {
   map.set('UniDirectHash', uniDirectHash())
   map.set('CombinedCrypto', combinedCrypto())
   return map
+}
+
+function initStatisMap() {
+  const map = new Map<string, Map<number, number>>()
+  peopleNames.forEach((v) => {
+    map.set(v, new Map<number, number>())
+  })
+  return map
+}
+
+function collectGroupInfo(arr: People[]) {
+  arr.forEach((v) => {
+    const gmap = statisMap.get(v.name)
+    if (gmap) {
+      const num = gmap.get(v.group)
+      if (num)
+        gmap.set(v.group, num + 1)
+      else
+        gmap.set(v.group, 1)
+    }
+  })
 }
 
 function shuffleArray(
@@ -55,26 +80,36 @@ function shuffleArray(
 }
 
 function randomGroup(algorithm: RandomAlgorithm) {
-  if (!isHandled.value)
-    isHandled.value = true
   if (randomTimes.value < 1)
     randomTimes.value = 1
   randomTimes.value = Math.ceil(randomTimes.value)
   for (let c = 0; c < randomTimes.value; c++) {
-    origin.value = shuffleArray(origin.value, map.get(algorithm)!)
+    origin.value = shuffleArray(origin.value, genMap.get(algorithm)!)
     for (let i = 0; i < origin.value.length; i++)
       origin.value[i].group = Math.ceil((i + 1) / groupSize.value)
+    collectGroupInfo(origin.value)
     cache.push(JSON.parse(JSON.stringify(origin.value)))
   }
+  shuffleNum.value += randomTimes.value
 }
 
 function outPutCache() {
   writeTextFile('output.json', JSON.stringify(cache), { dir: BaseDirectory.Desktop })
 }
+
+function setMenuVis(flag: boolean) {
+  menuVis.value = flag
+}
 </script>
 
 <template>
   <div class="container">
+    <Transition>
+      <Menu v-if="menuVis" :shuffle-num="shuffleNum" @set-vis="setMenuVis" />
+    </Transition>
+    <div style="margin-left: auto;cursor: pointer;" @click="setMenuVis(true)">
+      <svg xmlns="http://www.w3.org/2000/svg" width="1.5rem" height="1.5rem" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" /></svg>
+    </div>
     <div>
       <p style="font-size: large; font-weight: 600">
         Random Grouping Tool
@@ -104,7 +139,7 @@ function outPutCache() {
           Random
         </button>
         <span style="padding: 1em;" />
-        <button :disabled="!isHandled" @click="outPutCache()">
+        <button :disabled="shuffleNum <= 0" @click="outPutCache()">
           Output
         </button>
       </div>
@@ -112,4 +147,14 @@ function outPutCache() {
   </div>
 </template>
 
-<style></style>
+<style>
+.v-enter-active,
+.v-leave-active {
+  transition: opacity .5s ease;
+}
+
+.v-enter-from,
+.v-leave-to {
+  opacity: 0;
+}
+</style>

@@ -15,8 +15,7 @@
 }
 
 .container {
-  margin: 0;
-  padding-top: 10vh;
+  margin: 2rem 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -86,9 +85,15 @@ select {
 
 }
 
+input:focus {
+  border: #24c8db 1px solid;
+}
+
 select:hover {
   border-color: cyan;
 }
+
+
 
 @media (prefers-color-scheme: dark) {
   :root {
