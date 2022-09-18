@@ -32,6 +32,7 @@ const group = computed(() => {
 watch(algorithm, (v, ov) => {
   cache = []
   shuffleNum.value = 0
+  statisMap.clear()
 })
 
 provide('statisMap', statisMap)
@@ -72,9 +73,9 @@ function shuffleArray(
   generator: Generator<string, void, unknown>,
 ) {
   const result = arr
-  result.forEach(v => v.randomString = generator.next().value!)
+  result.forEach(v => v.random = generator.next().value!)
   result.sort((a, b) => {
-    return a.randomString > b.randomString ? 1 : -1
+    return a.random > b.random ? 1 : -1
   })
   return result
 }
