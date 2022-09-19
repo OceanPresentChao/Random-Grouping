@@ -1,7 +1,7 @@
 export interface People {
   name: string
   group: number
-  random: string
+  random: number
 }
 
 export const peopleNames = [
@@ -30,8 +30,8 @@ function initPeople(peopleNames: string[]) {
   peopleNames.forEach((v, index) => {
     arr.push({
       name: v,
-      group: Math.floor(index / 6),
-      random: '',
+      group: Math.floor(index / 6) + 1,
+      random: 0,
     })
   })
   return arr

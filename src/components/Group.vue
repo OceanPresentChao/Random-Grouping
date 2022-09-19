@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { Ref } from 'vue'
 import { computed, provide, ref, watch } from 'vue'
 import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs'
 import { type People, people, peopleNames } from '../utils/people'
-import { ANSIX, combinedCrypto, hmac, linearMod, uniDirectHash } from '../utils/algorithm'
+import { ANSIX, combinedCrypto, hmac, linearMod, sequence2Number, uniDirectHash } from '../utils/algorithm'
 import Menu from './Menu.vue'
 type RandomAlgorithm = 'LinearMod' | 'UniDirectHash' | 'Hmac' | 'ANSI' | 'CombinedCrypto'
 const algorithmSelections: Array<RandomAlgorithm> = ['LinearMod', 'UniDirectHash', 'Hmac', 'ANSI', 'CombinedCrypto']
@@ -15,24 +16,28 @@ let cache: Array<typeof origin.value> = []
 const genMap = initGenerators()
 const statisMap = initStatisMap()
 const menuVis = ref(false)
-const group = computed(() => {
+const group: Ref<Array<Array<string>>> = ref([])
+
+watch(origin, (v) => {
   const result = []
-  const groupNum = Math.ceil(origin.value.length / groupSize.value)
-  let tmp = []
-  for (let i = 0; i < origin.value.length; i++) {
-    tmp.push(origin.value[i].name)
-    if ((i + 1) % groupSize.value === 0 || i === origin.value.length - 1) {
-      result.push(tmp.concat())
-      tmp = []
+  const groupNum = Math.ceil(v.length / groupSize.value)
+  for (let i = 1; i <= groupNum; i++) {
+    let tmp = []
+    for (let j = 0; j < v.length; j++) {
+      if (v[j].group === i)
+        tmp.push(v[j].name)
     }
+    result.push(tmp.concat())
+    tmp = []
   }
-  return result
-})
+  group.value = result
+}, { immediate: true })
 
 watch(algorithm, (v, ov) => {
   cache = []
   shuffleNum.value = 0
-  statisMap.clear()
+  for (const value of statisMap.values())
+    value.clear()
 })
 
 provide('statisMap', statisMap)
@@ -68,15 +73,12 @@ function collectGroupInfo(arr: People[]) {
   })
 }
 
-function shuffleArray(
+function generateRn(
   arr: People[],
   generator: Generator<string, void, unknown>,
 ) {
-  const result = arr
-  result.forEach(v => v.random = generator.next().value!)
-  result.sort((a, b) => {
-    return a.random > b.random ? 1 : -1
-  })
+  const result: People[] = JSON.parse(JSON.stringify(arr))
+  result.forEach(v => v.random = sequence2Number(generator.next().value!))
   return result
 }
 
@@ -85,9 +87,18 @@ function randomGroup(algorithm: RandomAlgorithm) {
     randomTimes.value = 1
   randomTimes.value = Math.ceil(randomTimes.value)
   for (let c = 0; c < randomTimes.value; c++) {
-    origin.value = shuffleArray(origin.value, genMap.get(algorithm)!)
-    for (let i = 0; i < origin.value.length; i++)
-      origin.value[i].group = Math.ceil((i + 1) / groupSize.value)
+    origin.value = generateRn(origin.value, genMap.get(algorithm)!)
+    const tmp: People[] = JSON.parse(JSON.stringify(origin.value))
+    const map = new Map<number, People>()
+    for (const p of origin.value)
+      map.set(p.random, p)
+    tmp.sort((a, b) => {
+      return a.random > b.random ? 1 : -1
+    })
+    tmp.forEach((v, index) => {
+      const p = map.get(v.random)!
+      p.group = Math.floor(index / groupSize.value) + 1
+    })
     collectGroupInfo(origin.value)
     cache.push(JSON.parse(JSON.stringify(origin.value)))
   }

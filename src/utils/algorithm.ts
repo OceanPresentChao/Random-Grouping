@@ -7,9 +7,9 @@ export interface LinearModOption {
 }
 export function* linearMod(options: LinearModOption = {}) {
   const {
-    A = 2127,
-    C = 213,
-    M = 16684,
+    A = 439,
+    C = 101,
+    M = 18353,
     seed = Math.round(Date.now() / 1000).toString(),
   } = options
   const tmp = Number(seed)
@@ -146,4 +146,14 @@ function getOTP() {
   for (let i = 0; i < 32; i++)
     arr.push(getHex())
   return arr.join('')
+}
+
+export function sequence2Number(str: string) {
+  if (!isNaN(Number(str)))
+    return Number(str)
+  let sum = 0
+  const count = Math.min(10, str.length)
+  for (let i = 0; i < count; i++)
+    sum = sum * 10 + str.charCodeAt(i)
+  return sum
 }
